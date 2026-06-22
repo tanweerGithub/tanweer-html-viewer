@@ -1,10 +1,11 @@
 import './style.css';
-import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightActiveLine } from '@codemirror/view';
+import { EditorState, Compartment } from '@codemirror/state';
 import { html } from '@codemirror/lang-html';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { linter, lintGutter } from '@codemirror/lint';
+import { oneDark } from '@codemirror/theme-one-dark';
 import { HTMLHint } from 'htmlhint';
 import html2pdf from 'html2pdf.js';
 
@@ -55,7 +56,50 @@ const previewFrame = document.getElementById('preview-frame');
 const downloadBtn = document.getElementById('download-pdf');
 const workspace = document.getElementById('workspace');
 const divider = document.getElementById('divider');
+const themeToggle = document.getElementById('theme-toggle');
+const THEME_KEY = 'tanweer-html-viewer-theme';
+const themeCompartment = new Compartment();
 let previewTimer = null;
+
+const lightEditorTheme = EditorView.theme({
+  '&': {
+    height: '100%',
+    backgroundColor: 'var(--surface-raised)',
+    color: 'var(--text)',
+  },
+  '.cm-content': { padding: '12px 0', caretColor: 'var(--accent)' },
+  '.cm-line': { padding: '0 12px' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)' },
+  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+    backgroundColor: 'var(--accent-soft) !important',
+  },
+  '.cm-activeLine': { backgroundColor: 'var(--accent-soft)' },
+  '.cm-gutters': {
+    backgroundColor: 'var(--bg-subtle)',
+    color: 'var(--text-muted)',
+    borderRight: '1px solid var(--border)',
+  },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--accent-soft)' },
+}, { dark: false });
+
+function isDarkTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+function applyTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  themeToggle.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  editor.dispatch({
+    effects: themeCompartment.reconfigure(dark ? oneDark : lightEditorTheme),
+  });
+  localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const dark = saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches);
+  applyTheme(dark);
+}
 
 function posToOffset(doc, line, col) {
   try {
@@ -132,21 +176,18 @@ const editor = new EditorView({
     extensions: [
       lineNumbers(),
       highlightActiveLineGutter(),
+      highlightActiveLine(),
       history(),
       html(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       linter(htmlLinter, { delay: 300 }),
       lintGutter(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
+      themeCompartment.of(lightEditorTheme),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           debouncedPreview(update.state.doc.toString());
         }
-      }),
-      EditorView.theme({
-        '&': { height: '100%' },
-        '.cm-content': { padding: '12px 0' },
-        '.cm-line': { padding: '0 12px' },
       }),
     ],
   }),
@@ -154,6 +195,11 @@ const editor = new EditorView({
 });
 
 updatePreview(DEFAULT_HTML);
+initTheme();
+
+themeToggle.addEventListener('click', () => {
+  applyTheme(!isDarkTheme());
+});
 
 /* Resizable divider */
 const STORAGE_KEY = 'tanweer-html-viewer-split';
