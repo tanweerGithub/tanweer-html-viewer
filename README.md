@@ -2,6 +2,8 @@
 
 A minimalist web app for writing HTML, previewing it live, and exporting the result as a PDF.
 
+**Live demo:** [https://tanweergithub.github.io/tanweer-html-viewer/](https://tanweergithub.github.io/tanweer-html-viewer/)
+
 ## Features
 
 - **Split-pane layout** — Paste or edit HTML on the left; see a live preview on the right
@@ -47,6 +49,16 @@ npm run preview
 ```
 
 The static output is written to the `dist/` folder.
+
+## Deployment
+
+The app auto-deploys to **GitHub Pages** on every push to `main` via GitHub Actions.
+
+To build locally with the same base path used on GitHub Pages:
+
+```bash
+GITHUB_PAGES=true npm run build
+```
 
 ## Usage
 
