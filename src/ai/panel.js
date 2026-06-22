@@ -21,6 +21,8 @@ function saveApiKeys(keys) {
 
 export function createAiPanel({ onApply }) {
   const panel = document.getElementById('ai-panel');
+  const panelToggle = document.getElementById('ai-panel-toggle');
+  const panelBody = document.getElementById('ai-panel-body');
   const providerSelect = document.getElementById('ai-provider');
   const apiKeyInput = document.getElementById('ai-api-key');
   const instructionInput = document.getElementById('ai-instruction');
@@ -65,6 +67,13 @@ export function createAiPanel({ onApply }) {
     const keys = loadApiKeys();
     keys[providerSelect.value] = apiKeyInput.value;
     saveApiKeys(keys);
+  });
+
+  panelToggle.addEventListener('click', () => {
+    const expanding = panel.classList.contains('is-collapsed');
+    panel.classList.toggle('is-collapsed', !expanding);
+    panelBody.hidden = !expanding;
+    panelToggle.setAttribute('aria-expanded', String(expanding));
   });
 
   settingsToggle.addEventListener('click', () => {

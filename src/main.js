@@ -86,14 +86,6 @@ const lightEditorTheme = EditorView.theme({
     borderRight: '1px solid var(--border)',
   },
   '.cm-activeLineGutter': { backgroundColor: 'var(--accent-soft)' },
-  '.cm-thv-element-highlight': {
-    backgroundColor: 'rgba(91, 94, 247, 0.14)',
-    borderRadius: '2px',
-  },
-  '.cm-thv-element-flash': {
-    backgroundColor: 'rgba(91, 94, 247, 0.28)',
-    borderRadius: '2px',
-  },
 }, { dark: false });
 
 function isDarkTheme() {
@@ -226,9 +218,6 @@ editor = new EditorView({
           const code = update.state.doc.toString();
           debouncedPreview(code);
           inspect.onDocChanged(code);
-        }
-        if (update.selectionSet) {
-          inspect.onCursorActivity();
         }
       }),
     ],

@@ -94,32 +94,39 @@
               </div>
               <pre class="selection-snippet" id="selection-snippet" title="Click to locate in code"></pre>
             </div>
-            <div class="ai-panel" id="ai-panel">
-              <div class="ai-panel-header">
-                <span class="ai-panel-title">AI Pro Edit</span>
-                <button class="btn-text" id="ai-settings-toggle" type="button" aria-expanded="false">Settings</button>
+            <div class="ai-panel is-collapsed" id="ai-panel">
+              <button class="ai-panel-bar" id="ai-panel-toggle" type="button" aria-expanded="false">
+                <span class="ai-panel-bar-title">AI Pro Edit</span>
+                <svg class="ai-panel-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="ai-panel-body" id="ai-panel-body" hidden>
+                <div class="ai-panel-header">
+                  <button class="btn-text" id="ai-settings-toggle" type="button" aria-expanded="false">Settings</button>
+                </div>
+                <div class="ai-settings-body" id="ai-settings-body" hidden>
+                  <label class="field">
+                    <span>Provider</span>
+                    <select id="ai-provider"></select>
+                  </label>
+                  <label class="field">
+                    <span>API key <small>(saved locally)</small></span>
+                    <input id="ai-api-key" type="password" placeholder="Paste your API key" autocomplete="off" />
+                  </label>
+                  <p class="field-hint">Keys stay in your browser for now. A secure server proxy is planned.</p>
+                </div>
+                <p class="ai-scope-hint" id="ai-scope-hint">Turn on Inspect and select an element for focused edits.</p>
+                <div class="ai-input-row">
+                  <input
+                    id="ai-instruction"
+                    type="text"
+                    placeholder='e.g. "Make this heading larger and navy blue"'
+                  />
+                  <button class="btn-apply" id="ai-apply" type="button">Apply</button>
+                </div>
+                <p class="ai-status" id="ai-status" aria-live="polite"></p>
               </div>
-              <div class="ai-settings-body" id="ai-settings-body" hidden>
-                <label class="field">
-                  <span>Provider</span>
-                  <select id="ai-provider"></select>
-                </label>
-                <label class="field">
-                  <span>API key <small>(saved locally)</small></span>
-                  <input id="ai-api-key" type="password" placeholder="Paste your API key" autocomplete="off" />
-                </label>
-                <p class="field-hint">Keys stay in your browser for now. A secure server proxy is planned.</p>
-              </div>
-              <p class="ai-scope-hint" id="ai-scope-hint">Turn on Inspect and select an element for focused edits.</p>
-              <div class="ai-input-row">
-                <input
-                  id="ai-instruction"
-                  type="text"
-                  placeholder='e.g. "Make this heading larger and navy blue"'
-                />
-                <button class="btn-apply" id="ai-apply" type="button">Apply</button>
-              </div>
-              <p class="ai-status" id="ai-status" aria-live="polite"></p>
             </div>
           </div>
         </section>

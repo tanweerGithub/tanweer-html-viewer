@@ -27,24 +27,6 @@ function findCloseTag(html, tagName, from) {
   return match ? match.index + match[0].length : from;
 }
 
-function findMatchingOpen(html, tagName, closeStart) {
-  const re = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, 'gi');
-  let depth = 1;
-  let pos = closeStart;
-
-  while (pos > 0) {
-    const before = html.slice(0, pos);
-    const opens = [...before.matchAll(new RegExp(`<${tagName}(?:\\s[^>]*)?>`, 'gi'))];
-    const closes = [...before.matchAll(new RegExp(`</${tagName}\\s*>`, 'gi'))];
-    depth = opens.length - closes.length;
-    if (depth > 0 && opens.length) {
-      return opens[opens.length - 1].index;
-    }
-    pos = before.lastIndexOf('<', pos - 1);
-  }
-  return 0;
-}
-
 function describeElement(el) {
   const tag = el.tagName.toLowerCase();
   const parts = [tag];
@@ -66,6 +48,23 @@ function buildBreadcrumb(el) {
   return parts.join(' › ');
 }
 
+function findOpenTagInSource(html, el, fromIndex) {
+  const tag = el.tagName.toLowerCase();
+  let searchFrom = fromIndex;
+
+  if (el.id) {
+    const idRe = new RegExp(`<${tag}[^>]*\\sid=["']${el.id}["'][^>]*>`, 'i');
+    idRe.lastIndex = searchFrom;
+    const match = idRe.exec(html);
+    if (match) return match.index;
+  }
+
+  const re = new RegExp(`<${tag}(?:\\s[^>]*)?>`, 'gi');
+  re.lastIndex = searchFrom;
+  const match = re.exec(html);
+  return match ? match.index : -1;
+}
+
 export function buildElementMap(html) {
   if (!html?.trim()) return [];
 
@@ -73,26 +72,23 @@ export function buildElementMap(html) {
   const entries = [];
   let searchFrom = 0;
 
-  function walk(el) {
+  function walk(el, path) {
     if (!(el instanceof Element)) return;
 
+    const start = findOpenTagInSource(html, el, searchFrom);
+    if (start < 0) return;
+
     const tag = el.tagName.toLowerCase();
-    const openRe = new RegExp(`<${tag}(?:\\s[^>]*)?>`, 'gi');
-    openRe.lastIndex = searchFrom;
-    const openMatch = openRe.exec(html);
-
-    if (!openMatch) return;
-
-    const start = openMatch.index;
     const openEnd = findOpenTagEnd(html, start);
     const isVoid = VOID_TAGS.has(tag) || html.slice(start, openEnd).endsWith('/>');
     const end = isVoid ? openEnd : findCloseTag(html, tag, openEnd);
-
     const outerHTML = html.slice(start, end);
-    const idx = entries.length;
+    const pathKey = path.join('.');
 
     entries.push({
-      idx,
+      idx: entries.length,
+      path,
+      pathKey,
       tagName: tag,
       id: el.id || null,
       className: typeof el.className === 'string' ? el.className : '',
@@ -106,10 +102,13 @@ export function buildElementMap(html) {
     });
 
     searchFrom = openEnd;
-    for (const child of el.children) walk(child);
+    [...el.children].forEach((child, i) => walk(child, [...path, i]));
   }
 
-  walk(doc.documentElement);
+  if (doc.documentElement) {
+    walk(doc.documentElement, []);
+  }
+
   return entries;
 }
 
@@ -125,18 +124,34 @@ export function findElementAtOffset(entries, offset) {
   return match;
 }
 
+export function getElementByPath(root, path) {
+  let el = root;
+  for (const index of path) {
+    if (!el?.children?.[index]) return null;
+    el = el.children[index];
+  }
+  return el;
+}
+
 export function indexPreviewElements(doc) {
+  const byPath = new Map();
   const byIdx = new Map();
   let i = 0;
 
-  function walk(el) {
+  function walk(el, path) {
     if (!(el instanceof Element)) return;
+    const pathKey = path.join('.');
     el.setAttribute('data-thv-idx', String(i));
+    el.setAttribute('data-thv-path', pathKey);
+    byPath.set(pathKey, el);
     byIdx.set(i, el);
     i += 1;
-    for (const child of el.children) walk(child);
+    [...el.children].forEach((child, ci) => walk(child, [...path, ci]));
   }
 
-  if (doc.documentElement) walk(doc.documentElement);
-  return byIdx;
+  if (doc.documentElement) {
+    walk(doc.documentElement, []);
+  }
+
+  return { byPath, byIdx };
 }

@@ -2,11 +2,15 @@ import { StateEffect, StateField } from '@codemirror/state';
 import { Decoration, EditorView } from '@codemirror/view';
 import { buildElementMap, findElementAtOffset, indexPreviewElements } from './elementMap.js';
 
-const highlightMark = Decoration.mark({ class: 'cm-thv-element-highlight' });
-const flashMark = Decoration.mark({ class: 'cm-thv-element-flash' });
+const HOVER_MARK = 'cm-thv-hover';
+const SELECTED_MARK = 'cm-thv-selected';
+const FLASH_MARK = 'cm-thv-flash';
 
-const setElementHighlight = StateEffect.define();
-const flashElementHighlight = StateEffect.define();
+const hoverMark = Decoration.mark({ class: HOVER_MARK });
+const selectedMark = Decoration.mark({ class: SELECTED_MARK });
+const flashMark = Decoration.mark({ class: FLASH_MARK });
+
+const setInspectHighlight = StateEffect.define();
 
 const elementHighlightField = StateField.define({
   create() {
@@ -15,21 +19,13 @@ const elementHighlightField = StateField.define({
   update(deco, tr) {
     deco = deco.map(tr.changes);
     for (const effect of tr.effects) {
-      if (effect.is(setElementHighlight)) {
-        const { from, to } = effect.value ?? {};
-        if (from == null || to == null) {
+      if (effect.is(setInspectHighlight)) {
+        const { from, to, mode } = effect.value ?? {};
+        if (from == null || to == null || mode == null) {
           deco = Decoration.none;
         } else {
-          deco = Decoration.set([highlightMark.range(from, to)]);
-        }
-      }
-      if (effect.is(flashElementHighlight)) {
-        const { from, to } = effect.value ?? {};
-        if (from != null && to != null) {
-          deco = Decoration.set([flashMark.range(from, to)]);
-          setTimeout(() => {
-            // cleared by next highlight update
-          }, 900);
+          const mark = mode === 'selected' ? selectedMark : mode === 'flash' ? flashMark : hoverMark;
+          deco = Decoration.set([mark.range(from, to)]);
         }
       }
     }
@@ -38,35 +34,60 @@ const elementHighlightField = StateField.define({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-function ensurePreviewStyles(doc) {
+function ensurePreviewOverlay(doc) {
   if (!doc || doc.getElementById('thv-inspect-style')) return;
+
   const style = doc.createElement('style');
   style.id = 'thv-inspect-style';
   style.textContent = `
-    [data-thv-idx].thv-hover {
-      outline: 1px solid rgba(91, 94, 247, 0.55) !important;
-      background-color: rgba(91, 94, 247, 0.1) !important;
-      cursor: pointer;
+    #thv-overlay-root {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2147483646;
     }
-    [data-thv-idx].thv-selected {
-      outline: 2px solid rgba(91, 94, 247, 0.85) !important;
-      background-color: rgba(91, 94, 247, 0.16) !important;
+    .thv-overlay-box {
+      position: fixed;
+      pointer-events: none;
+      box-sizing: border-box;
+      transition: opacity 0.12s ease;
     }
-    [data-thv-idx].thv-flash {
-      animation: thv-flash 0.9s ease;
+    .thv-overlay-box.is-hover {
+      background: rgba(120, 120, 128, 0.18);
+      outline: 1px solid rgba(120, 120, 128, 0.45);
     }
-    @keyframes thv-flash {
-      0%, 100% { background-color: rgba(91, 94, 247, 0.16) !important; }
-      50% { background-color: rgba(91, 94, 247, 0.35) !important; }
+    .thv-overlay-box.is-selected {
+      background: rgba(26, 115, 232, 0.16);
+      outline: 2px solid rgba(26, 115, 232, 0.85);
     }
+    .thv-overlay-box.is-flash {
+      animation: thv-overlay-flash 0.85s ease;
+    }
+    @keyframes thv-overlay-flash {
+      0%, 100% { background: rgba(26, 115, 232, 0.16); }
+      40% { background: rgba(26, 115, 232, 0.38); }
+    }
+    [data-thv-idx] { cursor: default; }
+    .inspect-active [data-thv-idx] { cursor: pointer; }
   `;
   doc.head.appendChild(style);
+
+  const root = doc.createElement('div');
+  root.id = 'thv-overlay-root';
+  doc.body.appendChild(root);
 }
 
-function clearPreviewMarks(doc) {
-  doc?.querySelectorAll('[data-thv-idx]').forEach((el) => {
-    el.classList.remove('thv-hover', 'thv-selected', 'thv-flash');
-  });
+function getOverlayRoot(doc) {
+  ensurePreviewOverlay(doc);
+  return doc.getElementById('thv-overlay-root');
+}
+
+function positionOverlayBox(box, el, doc) {
+  const rect = el.getBoundingClientRect();
+  box.style.left = `${rect.left}px`;
+  box.style.top = `${rect.top}px`;
+  box.style.width = `${rect.width}px`;
+  box.style.height = `${rect.height}px`;
 }
 
 export function createInspectController({
@@ -82,9 +103,13 @@ export function createInspectController({
   let enabled = false;
   let entries = [];
   let previewByIdx = new Map();
-  let hoverIdx = null;
+  let previewByPath = new Map();
+  let hoverEntry = null;
   let selectedEntry = null;
-  let hoverRaf = null;
+  let hoverOverlay = null;
+  let selectedOverlay = null;
+  let flashTimer = null;
+  let scrollListener = null;
 
   function setDrawerVisible(visible) {
     drawerEl.classList.toggle('is-open', visible);
@@ -103,68 +128,163 @@ export function createInspectController({
     drawerSnippet.textContent = entry.outerHTML;
   }
 
-  function highlightCodeRange(from, to, flash = false) {
+  function highlightCode(entry, mode) {
     const editor = getEditor();
-    if (!editor) return;
-    editor.dispatch({
-      effects: (flash ? flashElementHighlight : setElementHighlight).of({ from, to }),
-    });
-    if (flash) {
-      editor.dispatch({
-        selection: { anchor: from, head: to },
-        scrollIntoView: true,
-      });
-      setTimeout(() => {
-        if (selectedEntry) {
-          highlightCodeRange(selectedEntry.start, selectedEntry.end, false);
-        } else {
-          getEditor()?.dispatch({ effects: setElementHighlight.of(null) });
-        }
-      }, 900);
+    if (!editor || !entry) {
+      editor?.dispatch({ effects: setInspectHighlight.of(null) });
+      return;
     }
+    editor.dispatch({
+      effects: setInspectHighlight.of({ from: entry.start, to: entry.end, mode }),
+    });
   }
 
-  function highlightPreview(idx, mode) {
+  function clearOverlays(doc) {
+    hoverOverlay?.remove();
+    selectedOverlay?.remove();
+    hoverOverlay = null;
+    selectedOverlay = null;
+  }
+
+  function createOverlay(doc, className) {
+    const box = doc.createElement('div');
+    box.className = `thv-overlay-box ${className}`;
+    getOverlayRoot(doc).appendChild(box);
+    return box;
+  }
+
+  function getPreviewElement(entry) {
+    if (!entry) return null;
+    return previewByPath.get(entry.pathKey) ?? previewByIdx.get(entry.idx) ?? null;
+  }
+
+  function repositionOverlays() {
     const doc = previewFrame.contentDocument;
     if (!doc) return;
-    clearPreviewMarks(doc);
-    if (idx == null) return;
-
-    const el = previewByIdx.get(idx);
-    if (!el) return;
-    if (mode === 'hover') el.classList.add('thv-hover');
-    if (mode === 'selected') el.classList.add('thv-selected');
-    if (mode === 'flash') {
-      el.classList.add('thv-selected', 'thv-flash');
-      setTimeout(() => el.classList.remove('thv-flash'), 900);
+    if (hoverOverlay && hoverEntry) {
+      const el = getPreviewElement(hoverEntry);
+      if (el) positionOverlayBox(hoverOverlay, el, doc);
+    }
+    if (selectedOverlay && selectedEntry) {
+      const el = getPreviewElement(selectedEntry);
+      if (el) positionOverlayBox(selectedOverlay, el, doc);
     }
   }
 
-  function selectEntry(entry, { flash = false, source } = {}) {
+  function scrollPreviewToElement(el, { flash = false } = {}) {
+    const doc = previewFrame.contentDocument;
+    if (!doc || !el) return;
+
+    const frameWindow = previewFrame.contentWindow;
+    const rect = el.getBoundingClientRect();
+    const frameHeight = frameWindow.innerHeight;
+    const targetTop = frameWindow.scrollY + rect.top - frameHeight / 2 + rect.height / 2;
+
+    frameWindow.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+
+    if (flash) {
+      selectedOverlay?.classList.remove('is-flash');
+      void selectedOverlay?.offsetWidth;
+      selectedOverlay?.classList.add('is-flash');
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => selectedOverlay?.classList.remove('is-flash'), 900);
+    }
+  }
+
+  function showPreviewHighlight(entry, mode) {
+    const doc = previewFrame.contentDocument;
+    if (!doc) return;
+
+    const el = getPreviewElement(entry);
+    if (!el) return;
+
+    if (mode === 'hover') {
+      if (selectedEntry) return;
+      hoverOverlay?.remove();
+      hoverOverlay = createOverlay(doc, 'is-hover');
+      positionOverlayBox(hoverOverlay, el, doc);
+      highlightCode(entry, 'hover');
+      return;
+    }
+
+    hoverOverlay?.remove();
+    hoverOverlay = null;
+
+    selectedOverlay?.remove();
+    selectedOverlay = createOverlay(doc, 'is-selected');
+    positionOverlayBox(selectedOverlay, el, doc);
+    highlightCode(entry, mode === 'flash' ? 'flash' : 'selected');
+
+    if (mode === 'flash' || mode === 'selected') {
+      scrollPreviewToElement(el, { flash: mode === 'flash' });
+    }
+  }
+
+  function clearHover() {
+    hoverEntry = null;
+    hoverOverlay?.remove();
+    hoverOverlay = null;
+    if (!selectedEntry) {
+      getEditor()?.dispatch({ effects: setInspectHighlight.of(null) });
+    } else {
+      highlightCode(selectedEntry, 'selected');
+    }
+  }
+
+  function selectEntry(entry, { flash = false } = {}) {
     selectedEntry = entry ?? null;
+
     if (!entry) {
-      highlightPreview(null);
-      highlightCodeRange(0, 0);
-      getEditor()?.dispatch({ effects: setElementHighlight.of(null) });
+      clearOverlays();
+      getEditor()?.dispatch({ effects: setInspectHighlight.of(null) });
       updateDrawer(null);
       onSelectionChange?.(null);
       return;
     }
 
-    highlightPreview(entry.idx, flash ? 'flash' : 'selected');
-    highlightCodeRange(entry.start, entry.end, flash);
+    hoverEntry = null;
+    hoverOverlay?.remove();
+    hoverOverlay = null;
+
+    showPreviewHighlight(entry, flash ? 'flash' : 'selected');
     updateDrawer(entry);
     onSelectionChange?.(entry);
+
+    if (flash) {
+      const editor = getEditor();
+      editor?.dispatch({
+        selection: { anchor: entry.start, head: entry.end },
+        scrollIntoView: true,
+      });
+      highlightCode(entry, 'flash');
+      setTimeout(() => {
+        if (selectedEntry?.pathKey === entry.pathKey) {
+          highlightCode(entry, 'selected');
+        }
+      }, 900);
+    }
+  }
+
+  function applyHover(entry) {
+    if (!enabled || selectedEntry) return;
+    if (hoverEntry?.pathKey === entry?.pathKey) return;
+
+    hoverEntry = entry ?? null;
+    if (!entry) {
+      clearHover();
+      return;
+    }
+
+    showPreviewHighlight(entry, 'hover');
   }
 
   function rebuildMap(html) {
     entries = buildElementMap(html);
-    if (enabled && hoverIdx != null) {
-      const still = entries.find((e) => e.idx === hoverIdx);
-      if (!still) hoverIdx = null;
+    if (hoverEntry) {
+      hoverEntry = entries.find((e) => e.pathKey === hoverEntry.pathKey) ?? null;
     }
     if (selectedEntry) {
-      const still = entries.find((e) => e.idx === selectedEntry.idx);
+      const still = entries.find((e) => e.pathKey === selectedEntry.pathKey);
       if (still) {
         selectedEntry = still;
         selectEntry(still);
@@ -176,54 +296,88 @@ export function createInspectController({
 
   function syncPreviewIndex() {
     const doc = previewFrame.contentDocument;
-    if (!doc) return;
-    ensurePreviewStyles(doc);
-    previewByIdx = indexPreviewElements(doc);
-    if (selectedEntry) highlightPreview(selectedEntry.idx, 'selected');
-    else if (hoverIdx != null) highlightPreview(hoverIdx, 'hover');
+    if (!doc?.documentElement) return;
+
+    ensurePreviewOverlay(doc);
+    const maps = indexPreviewElements(doc);
+    previewByIdx = maps.byIdx;
+    previewByPath = maps.byPath;
+    doc.documentElement.classList.toggle('inspect-active', enabled);
+
+    if (scrollListener) {
+      previewFrame.contentWindow?.removeEventListener('scroll', scrollListener, true);
+    }
+    scrollListener = () => repositionOverlays();
+    previewFrame.contentWindow?.addEventListener('scroll', scrollListener, true);
+
+    repositionOverlays();
+    if (selectedEntry) showPreviewHighlight(selectedEntry, 'selected');
+    else if (hoverEntry) showPreviewHighlight(hoverEntry, 'hover');
   }
 
-  function handleCursorActivity() {
+  function resolveEntryAtOffset(offset) {
+    return findElementAtOffset(entries, offset);
+  }
+
+  function handleEditorMouseMove(event) {
+    if (!enabled || selectedEntry) return;
+    const editor = getEditor();
+    if (!editor) return;
+
+    const pos = editor.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (pos == null) {
+      clearHover();
+      return;
+    }
+
+    applyHover(resolveEntryAtOffset(pos));
+  }
+
+  function handleEditorMouseLeave() {
+    if (!selectedEntry) clearHover();
+  }
+
+  function handleEditorClick(event) {
     if (!enabled) return;
     const editor = getEditor();
     if (!editor) return;
-    const offset = editor.state.selection.main.head;
-    const entry = findElementAtOffset(entries, offset);
-    hoverIdx = entry?.idx ?? null;
-    if (!selectedEntry) {
-      highlightPreview(hoverIdx, 'hover');
-      if (entry) highlightCodeRange(entry.start, entry.end);
-      else getEditor()?.dispatch({ effects: setElementHighlight.of(null) });
-    }
+
+    const pos = editor.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (pos == null) return;
+
+    const entry = resolveEntryAtOffset(pos);
+    if (entry) selectEntry(entry, { flash: true });
   }
 
-  function onPreviewLoad() {
-    syncPreviewIndex();
+  function bindPreviewEvents() {
     const doc = previewFrame.contentDocument;
-    if (!doc || !enabled) return;
+    if (!doc) return;
 
-    doc.addEventListener('mouseover', (e) => {
-      if (!enabled) return;
-      const el = e.target.closest('[data-thv-idx]');
-      if (!el) return;
-      const idx = Number(el.getAttribute('data-thv-idx'));
-      hoverIdx = idx;
-      if (!selectedEntry) {
-        highlightPreview(idx, 'hover');
-        const entry = entries.find((en) => en.idx === idx);
-        if (entry) highlightCodeRange(entry.start, entry.end);
+    doc.addEventListener('mousemove', (e) => {
+      if (!enabled || selectedEntry) return;
+      const el = e.target.closest('[data-thv-path]');
+      if (!el) {
+        clearHover();
+        return;
       }
+      const pathKey = el.getAttribute('data-thv-path');
+      const entry = entries.find((en) => en.pathKey === pathKey);
+      applyHover(entry ?? null);
+    });
+
+    doc.addEventListener('mouseleave', () => {
+      if (!selectedEntry) clearHover();
     });
 
     doc.addEventListener('click', (e) => {
       if (!enabled) return;
       e.preventDefault();
       e.stopPropagation();
-      const el = e.target.closest('[data-thv-idx]');
+      const el = e.target.closest('[data-thv-path]');
       if (!el) return;
-      const idx = Number(el.getAttribute('data-thv-idx'));
-      const entry = entries.find((en) => en.idx === idx);
-      if (entry) selectEntry(entry, { flash: true, source: 'preview' });
+      const pathKey = el.getAttribute('data-thv-path');
+      const entry = entries.find((en) => en.pathKey === pathKey);
+      if (entry) selectEntry(entry, { flash: true });
     });
   }
 
@@ -233,57 +387,57 @@ export function createInspectController({
     toggleEl.setAttribute('aria-pressed', String(enabled));
     previewFrame.classList.toggle('inspect-active', enabled);
 
+    const doc = previewFrame.contentDocument;
+    doc?.documentElement?.classList.toggle('inspect-active', enabled);
+
     if (!enabled) {
-      hoverIdx = null;
+      hoverEntry = null;
       selectEntry(null);
-      clearPreviewMarks(previewFrame.contentDocument);
-      getEditor()?.dispatch({ effects: setElementHighlight.of(null) });
+      clearOverlays();
+      getEditor()?.dispatch({ effects: setInspectHighlight.of(null) });
       return;
     }
 
     rebuildMap(getEditor()?.state.doc.toString() ?? '');
     syncPreviewIndex();
-    handleCursorActivity();
+    bindPreviewEvents();
   });
 
   drawerClose.addEventListener('click', () => selectEntry(null));
 
   drawerSnippet.addEventListener('click', () => {
-    if (selectedEntry) selectEntry(selectedEntry, { flash: true, source: 'drawer' });
+    if (selectedEntry) selectEntry(selectedEntry, { flash: true });
   });
 
   function bindEditorEvents() {
     const editor = getEditor();
     if (!editor) return;
-    editor.dom.addEventListener('click', () => {
-      if (!enabled) return;
-      const offset = getEditor().state.selection.main.head;
-      const entry = findElementAtOffset(entries, offset);
-      if (entry) selectEntry(entry, { flash: true, source: 'code' });
-    });
+
+    editor.dom.addEventListener('mousemove', handleEditorMouseMove);
+    editor.dom.addEventListener('mouseleave', handleEditorMouseLeave);
+    editor.dom.addEventListener('click', handleEditorClick);
   }
 
   return {
     bindEditorEvents,
     extensions: [elementHighlightField],
     rebuildMap,
-    onPreviewLoad,
+    onPreviewLoad() {
+      syncPreviewIndex();
+      bindPreviewEvents();
+    },
     onDocChanged(html) {
       rebuildMap(html);
-    },
-    onCursorActivity() {
-      if (hoverRaf) cancelAnimationFrame(hoverRaf);
-      hoverRaf = requestAnimationFrame(handleCursorActivity);
+      requestAnimationFrame(() => {
+        syncPreviewIndex();
+        repositionOverlays();
+      });
     },
     getSelectedEntry() {
       return selectedEntry;
     },
     isEnabled() {
       return enabled;
-    },
-    selectEntryByIdx(idx) {
-      const entry = entries.find((e) => e.idx === idx);
-      if (entry) selectEntry(entry, { flash: true });
     },
   };
 }
