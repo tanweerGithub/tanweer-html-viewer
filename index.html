@@ -57,11 +57,71 @@
 
       <main class="workspace" id="workspace">
         <section class="panel panel-code" id="panel-code">
-          <div class="panel-header">
+          <div class="panel-header panel-header-code">
             <span class="panel-label">Code</span>
-            <span class="lint-status" id="lint-status"></span>
+            <div class="panel-header-tools">
+              <button class="btn-inspect" id="inspect-toggle" type="button" aria-pressed="false" title="Inspect mode">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                Inspect
+              </button>
+              <div class="snapshots-wrap">
+                <button class="btn-snapshots" id="snapshots-toggle" type="button" aria-expanded="false">
+                  Snapshots
+                </button>
+                <div class="snapshots-menu" id="snapshots-menu" hidden>
+                  <div class="snapshots-menu-header">
+                    <span>Saved versions</span>
+                    <button class="btn-text" id="snapshot-create" type="button">+ Save</button>
+                  </div>
+                  <ul class="snapshots-list" id="snapshots-list"></ul>
+                </div>
+              </div>
+              <span class="lint-status" id="lint-status"></span>
+            </div>
           </div>
-          <div class="editor-wrap" id="editor"></div>
+          <div class="code-body">
+            <div class="editor-wrap" id="editor"></div>
+            <div class="selection-drawer" id="selection-drawer" aria-hidden="true">
+              <div class="selection-drawer-header">
+                <div>
+                  <span class="selection-drawer-label">Selected element</span>
+                  <p class="selection-breadcrumb" id="selection-breadcrumb"></p>
+                </div>
+                <button class="btn-icon" id="selection-close" type="button" aria-label="Clear selection">×</button>
+              </div>
+              <pre class="selection-snippet" id="selection-snippet" title="Click to locate in code"></pre>
+            </div>
+            <div class="ai-panel" id="ai-panel">
+              <div class="ai-panel-header">
+                <span class="ai-panel-title">AI Pro Edit</span>
+                <button class="btn-text" id="ai-settings-toggle" type="button" aria-expanded="false">Settings</button>
+              </div>
+              <div class="ai-settings-body" id="ai-settings-body" hidden>
+                <label class="field">
+                  <span>Provider</span>
+                  <select id="ai-provider"></select>
+                </label>
+                <label class="field">
+                  <span>API key <small>(saved locally)</small></span>
+                  <input id="ai-api-key" type="password" placeholder="Paste your API key" autocomplete="off" />
+                </label>
+                <p class="field-hint">Keys stay in your browser for now. A secure server proxy is planned.</p>
+              </div>
+              <p class="ai-scope-hint" id="ai-scope-hint">Turn on Inspect and select an element for focused edits.</p>
+              <div class="ai-input-row">
+                <input
+                  id="ai-instruction"
+                  type="text"
+                  placeholder='e.g. "Make this heading larger and navy blue"'
+                />
+                <button class="btn-apply" id="ai-apply" type="button">Apply</button>
+              </div>
+              <p class="ai-status" id="ai-status" aria-live="polite"></p>
+            </div>
+          </div>
         </section>
 
         <div
@@ -86,6 +146,7 @@
             </button>
           </div>
           <div class="preview-wrap">
+            <p class="preview-hint" id="preview-hint" hidden>Click an element to select it for editing</p>
             <iframe
               id="preview-frame"
               title="HTML Preview"

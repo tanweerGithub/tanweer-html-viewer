@@ -8,6 +8,9 @@ import { linter, lintGutter } from '@codemirror/lint';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { HTMLHint } from 'htmlhint';
 import html2pdf from 'html2pdf.js';
+import { createInspectController } from './inspect/inspectController.js';
+import { createSnapshotsUi } from './snapshots/ui.js';
+import { createAiPanel } from './ai/panel.js';
 
 const DEFAULT_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -53,6 +56,7 @@ const HTMLHINT_RULES = {
 
 const lintStatusEl = document.getElementById('lint-status');
 const previewFrame = document.getElementById('preview-frame');
+const previewHint = document.getElementById('preview-hint');
 const downloadBtn = document.getElementById('download-pdf');
 const workspace = document.getElementById('workspace');
 const divider = document.getElementById('divider');
@@ -60,6 +64,8 @@ const themeToggle = document.getElementById('theme-toggle');
 const THEME_KEY = 'tanweer-html-viewer-theme';
 const themeCompartment = new Compartment();
 let previewTimer = null;
+let editor;
+let aiPanel;
 
 const lightEditorTheme = EditorView.theme({
   '&': {
@@ -80,6 +86,14 @@ const lightEditorTheme = EditorView.theme({
     borderRight: '1px solid var(--border)',
   },
   '.cm-activeLineGutter': { backgroundColor: 'var(--accent-soft)' },
+  '.cm-thv-element-highlight': {
+    backgroundColor: 'rgba(91, 94, 247, 0.14)',
+    borderRadius: '2px',
+  },
+  '.cm-thv-element-flash': {
+    backgroundColor: 'rgba(91, 94, 247, 0.28)',
+    borderRadius: '2px',
+  },
 }, { dark: false });
 
 function isDarkTheme() {
@@ -170,7 +184,29 @@ function debouncedPreview(code) {
   previewTimer = setTimeout(() => updatePreview(code), 200);
 }
 
-const editor = new EditorView({
+function setEditorContent(code) {
+  editor.dispatch({
+    changes: { from: 0, to: editor.state.doc.length, insert: code },
+  });
+  updatePreview(code);
+  inspect.rebuildMap(code);
+}
+
+const inspect = createInspectController({
+  getEditor: () => editor,
+  previewFrame,
+  toggleEl: document.getElementById('inspect-toggle'),
+  drawerEl: document.getElementById('selection-drawer'),
+  drawerBreadcrumb: document.getElementById('selection-breadcrumb'),
+  drawerSnippet: document.getElementById('selection-snippet'),
+  drawerClose: document.getElementById('selection-close'),
+  onSelectionChange(entry) {
+    aiPanel?.updateScopeHint(!!entry);
+    previewHint.hidden = !inspect.isEnabled() || !!entry;
+  },
+});
+
+editor = new EditorView({
   state: EditorState.create({
     doc: DEFAULT_HTML,
     extensions: [
@@ -184,9 +220,15 @@ const editor = new EditorView({
       lintGutter(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       themeCompartment.of(lightEditorTheme),
+      ...inspect.extensions,
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
-          debouncedPreview(update.state.doc.toString());
+          const code = update.state.doc.toString();
+          debouncedPreview(code);
+          inspect.onDocChanged(code);
+        }
+        if (update.selectionSet) {
+          inspect.onCursorActivity();
         }
       }),
     ],
@@ -194,8 +236,32 @@ const editor = new EditorView({
   parent: document.getElementById('editor'),
 });
 
+inspect.bindEditorEvents();
+
+const snapshotsUi = createSnapshotsUi({
+  getHtml: () => editor.state.doc.toString(),
+  setHtml: setEditorContent,
+});
+
+aiPanel = createAiPanel({
+  onApply() {
+    // Backend wiring in Phase 2
+  },
+});
+
 updatePreview(DEFAULT_HTML);
+inspect.rebuildMap(DEFAULT_HTML);
+snapshotsUi.ensureOriginal(DEFAULT_HTML);
 initTheme();
+aiPanel.updateScopeHint(false);
+
+previewFrame.addEventListener('load', () => {
+  inspect.onPreviewLoad();
+});
+
+document.getElementById('inspect-toggle').addEventListener('click', () => {
+  previewHint.hidden = !inspect.isEnabled();
+});
 
 themeToggle.addEventListener('click', () => {
   applyTheme(!isDarkTheme());
