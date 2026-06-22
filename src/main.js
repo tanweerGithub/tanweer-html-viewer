@@ -10,6 +10,7 @@ import { HTMLHint } from 'htmlhint';
 import html2pdf from 'html2pdf.js';
 import { createInspectController } from './inspect/inspectController.js';
 import { createSnapshotsUi } from './snapshots/ui.js';
+import { createSnapshot } from './snapshots/manager.js';
 import { createAiPanel } from './ai/panel.js';
 
 const DEFAULT_HTML = `<!DOCTYPE html>
@@ -225,8 +226,6 @@ editor = new EditorView({
   parent: document.getElementById('editor'),
 });
 
-inspect.bindEditorEvents();
-
 const snapshotsUi = createSnapshotsUi({
   getHtml: () => editor.state.doc.toString(),
   setHtml: setEditorContent,
@@ -321,6 +320,23 @@ divider.addEventListener('keydown', (e) => {
 });
 
 loadSplit();
+
+if (import.meta.env.DEV) {
+  window.__setEditorHtml = setEditorContent;
+  window.__inspect = inspect;
+  window.__getEditor = () => editor;
+}
+
+document.getElementById('load-sample')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}samples/sdet-resume.html`);
+    const html = await res.text();
+    setEditorContent(html);
+    createSnapshot(html, 'SDET Resume');
+  } catch (err) {
+    console.error('Failed to load sample:', err);
+  }
+});
 
 /* PDF download */
 downloadBtn.addEventListener('click', async () => {

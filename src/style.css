@@ -271,7 +271,8 @@ body {
 }
 
 .btn-inspect,
-.btn-snapshots {
+.btn-snapshots,
+.btn-sample {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -288,7 +289,8 @@ body {
 }
 
 .btn-inspect:hover,
-.btn-snapshots:hover {
+.btn-snapshots:hover,
+.btn-sample:hover {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-soft);

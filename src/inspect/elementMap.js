@@ -139,7 +139,7 @@ export function indexPreviewElements(doc) {
   let i = 0;
 
   function walk(el, path) {
-    if (!(el instanceof Element)) return;
+    if (!el || el.nodeType !== 1) return;
     const pathKey = path.join('.');
     el.setAttribute('data-thv-idx', String(i));
     el.setAttribute('data-thv-path', pathKey);

@@ -67,6 +67,7 @@ function ensurePreviewOverlay(doc) {
       0%, 100% { background: rgba(26, 115, 232, 0.16); }
       40% { background: rgba(26, 115, 232, 0.38); }
     }
+    html, body { overflow: auto !important; }
     [data-thv-idx] { cursor: default; }
     .inspect-active [data-thv-idx] { cursor: pointer; }
   `;
@@ -172,15 +173,26 @@ export function createInspectController({
   }
 
   function scrollPreviewToElement(el, { flash = false } = {}) {
+    if (!el) return;
+
+    const win = previewFrame.contentWindow;
     const doc = previewFrame.contentDocument;
-    if (!doc || !el) return;
+    if (win && doc) {
+      const rect = el.getBoundingClientRect();
+      const viewH = win.innerHeight;
+      const scrollEl = doc.scrollingElement || doc.documentElement;
+      const current = scrollEl.scrollTop || win.scrollY || 0;
+      const target = current + rect.top - viewH / 2 + rect.height / 2;
+      const top = Math.max(0, target);
+      scrollEl.scrollTo({ top, behavior: 'smooth' });
+      win.scrollTo({ top, behavior: 'smooth' });
+    } else {
+      el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+    }
 
-    const frameWindow = previewFrame.contentWindow;
-    const rect = el.getBoundingClientRect();
-    const frameHeight = frameWindow.innerHeight;
-    const targetTop = frameWindow.scrollY + rect.top - frameHeight / 2 + rect.height / 2;
-
-    frameWindow.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+    setTimeout(() => repositionOverlays(), 100);
+    setTimeout(() => repositionOverlays(), 350);
+    setTimeout(() => repositionOverlays(), 700);
 
     if (flash) {
       selectedOverlay?.classList.remove('is-flash');
@@ -319,35 +331,43 @@ export function createInspectController({
     return findElementAtOffset(entries, offset);
   }
 
-  function handleEditorMouseMove(event) {
-    if (!enabled || selectedEntry) return;
-    const editor = getEditor();
-    if (!editor) return;
+  function posFromEvent(event, view) {
+    const hit = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    return typeof hit === 'number' ? hit : hit?.pos ?? null;
+  }
 
-    const pos = editor.posAtCoords({ x: event.clientX, y: event.clientY });
+  function handleEditorMouseMove(event, view) {
+    if (!enabled || selectedEntry) return false;
+    const pos = posFromEvent(event, view);
     if (pos == null) {
       clearHover();
-      return;
+      return false;
     }
-
     applyHover(resolveEntryAtOffset(pos));
+    return false;
   }
 
   function handleEditorMouseLeave() {
     if (!selectedEntry) clearHover();
+    return false;
   }
 
-  function handleEditorClick(event) {
-    if (!enabled) return;
-    const editor = getEditor();
-    if (!editor) return;
-
-    const pos = editor.posAtCoords({ x: event.clientX, y: event.clientY });
-    if (pos == null) return;
-
+  function handleEditorClick(event, view) {
+    if (!enabled) return false;
+    const pos = posFromEvent(event, view);
+    if (pos == null) return false;
     const entry = resolveEntryAtOffset(pos);
     if (entry) selectEntry(entry, { flash: true });
+    return false;
   }
+
+  const editorEventHandlers = EditorView.domEventHandlers({
+    mousemove: handleEditorMouseMove,
+    pointermove: handleEditorMouseMove,
+    mouseleave: handleEditorMouseLeave,
+    pointerleave: handleEditorMouseLeave,
+    click: handleEditorClick,
+  });
 
   function bindPreviewEvents() {
     const doc = previewFrame.contentDocument;
@@ -371,14 +391,14 @@ export function createInspectController({
 
     doc.addEventListener('click', (e) => {
       if (!enabled) return;
-      e.preventDefault();
-      e.stopPropagation();
       const el = e.target.closest('[data-thv-path]');
       if (!el) return;
+      e.preventDefault();
+      e.stopPropagation();
       const pathKey = el.getAttribute('data-thv-path');
       const entry = entries.find((en) => en.pathKey === pathKey);
       if (entry) selectEntry(entry, { flash: true });
-    });
+    }, true);
   }
 
   toggleEl.addEventListener('click', () => {
@@ -409,18 +429,8 @@ export function createInspectController({
     if (selectedEntry) selectEntry(selectedEntry, { flash: true });
   });
 
-  function bindEditorEvents() {
-    const editor = getEditor();
-    if (!editor) return;
-
-    editor.dom.addEventListener('mousemove', handleEditorMouseMove);
-    editor.dom.addEventListener('mouseleave', handleEditorMouseLeave);
-    editor.dom.addEventListener('click', handleEditorClick);
-  }
-
   return {
-    bindEditorEvents,
-    extensions: [elementHighlightField],
+    extensions: [elementHighlightField, editorEventHandlers],
     rebuildMap,
     onPreviewLoad() {
       syncPreviewIndex();
@@ -438,6 +448,19 @@ export function createInspectController({
     },
     isEnabled() {
       return enabled;
+    },
+    debugAtClientCoords(x, y) {
+      const view = getEditor();
+      if (!view) return null;
+      const pos = posFromEvent({ clientX: x, clientY: y }, view);
+      const entry = pos == null ? null : resolveEntryAtOffset(pos);
+      return {
+        pos,
+        entries: entries.length,
+        entry: entry ? { label: entry.label, pathKey: entry.pathKey } : null,
+        enabled,
+        selected: !!selectedEntry,
+      };
     },
   };
 }

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jane Doe — SDET Resume</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      color: #1f2937;
+      line-height: 1.5;
+    }
+    .page {
+      max-width: 820px;
+      margin: 32px auto;
+      background: #fff;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+      color: #fff;
+      padding: 36px 40px;
+    }
+    .header h1 { font-size: 2rem; font-weight: 600; letter-spacing: -0.02em; }
+    .header .role { margin-top: 6px; font-size: 1.05rem; opacity: 0.9; }
+    .header .contact { margin-top: 14px; font-size: 0.88rem; opacity: 0.85; }
+    .content { padding: 32px 40px 40px; }
+    section { margin-bottom: 28px; }
+    section:last-child { margin-bottom: 0; }
+    h2 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #2563eb;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 6px;
+      margin-bottom: 14px;
+    }
+    .skills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .skill {
+      background: #eff6ff;
+      color: #1d4ed8;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+    .job { margin-bottom: 18px; }
+    .job h3 { font-size: 1rem; font-weight: 600; }
+    .job .meta { font-size: 0.85rem; color: #6b7280; margin: 4px 0 8px; }
+    .job ul { margin-left: 18px; font-size: 0.92rem; color: #374151; }
+    .job li { margin-bottom: 4px; }
+    .project {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .project h3 { font-size: 0.95rem; font-weight: 600; }
+    .project p { font-size: 0.88rem; color: #4b5563; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1>Jane Doe</h1>
+      <p class="role">Senior SDET · Test Automation Engineer</p>
+      <p class="contact">jane.doe@email.com · +1 (555) 012-3456 · Austin, TX · linkedin.com/in/janedoe</p>
+    </header>
+    <div class="content">
+      <section id="summary">
+        <h2>Summary</h2>
+        <p>SDET with 8+ years building scalable test automation frameworks across web, API, and CI/CD pipelines. Passionate about quality gates, observability, and developer-friendly testing tooling.</p>
+      </section>
+      <section id="skills">
+        <h2>Skills</h2>
+        <div class="skills">
+          <span class="skill">Selenium</span>
+          <span class="skill">Playwright</span>
+          <span class="skill">Cypress</span>
+          <span class="skill">Python</span>
+          <span class="skill">TypeScript</span>
+          <span class="skill">CI/CD</span>
+          <span class="skill">API Testing</span>
+          <span class="skill">Performance</span>
+        </div>
+      </section>
+      <section id="experience">
+        <h2>Experience</h2>
+        <div class="job">
+          <h3>Lead SDET — TechCorp Inc.</h3>
+          <p class="meta">2021 – Present · Remote</p>
+          <ul>
+            <li>Designed Playwright-based E2E suite reducing regression time by 60%</li>
+            <li>Integrated quality gates in GitHub Actions for 12 microservices</li>
+            <li>Mentored 4 QA engineers on test architecture and code review practices</li>
+          </ul>
+        </div>
+        <div class="job">
+          <h3>SDET — DataFlow Systems</h3>
+          <p class="meta">2018 – 2021 · Austin, TX</p>
+          <ul>
+            <li>Built REST API validation framework used across 3 product teams</li>
+            <li>Introduced contract testing with Pact for consumer-driven workflows</li>
+          </ul>
+        </div>
+      </section>
+      <section id="projects">
+        <h2>Projects</h2>
+        <div class="project">
+          <h3>AutoHeal — Self-healing locator library</h3>
+          <p>Open-source Python library for resilient UI selectors in flaky test environments. 1.2k GitHub stars.</p>
+        </div>
+        <div class="project">
+          <h3>TestPulse — CI test analytics dashboard</h3>
+          <p>Real-time flake detection and failure clustering integrated with Jenkins and GitLab CI.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>
