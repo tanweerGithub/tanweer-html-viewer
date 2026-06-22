@@ -69,63 +69,6 @@ GITHUB_PAGES=true npm run build
 
 Lint status appears in the code panel header (`No issues`, or error/warning counts).
 
-## Open with pre-filled HTML (deep link)
-
-You can link from another app so the viewer opens with HTML already loaded in the editor.
-
-### URL format
-
-| Parameter | Encoding | Best for |
-|---|---|---|
-| `?html=` | Base64url | Full HTML documents (recommended) |
-| `?code=` | Plain URL-encoded text | Small snippets |
-
-Example:
-
-```
-https://tanweergithub.github.io/tanweer-html-viewer/?html=PCFET0NUWVBFIGh0bWw+...
-```
-
-The app loads the HTML, populates the editor and preview, then removes the parameter from the address bar.
-
-### From your HTML generator (JavaScript)
-
-**Option A — helper script (easiest)**
-
-```html
-<a id="open-viewer" target="_blank" rel="noopener">Open in HTML Viewer</a>
-
-<script src="https://tanweergithub.github.io/tanweer-html-viewer/link-helper.js"></script>
-<script>
-  const generatedHtml = '<!DOCTYPE html><html>...</html>';
-  document.getElementById('open-viewer').href =
-    TanweerHtmlViewer.buildLink(generatedHtml);
-</script>
-```
-
-**Option B — inline (no external script)**
-
-```javascript
-function buildViewerLink(html) {
-  const base = 'https://tanweergithub.github.io/tanweer-html-viewer/';
-  const bytes = new TextEncoder().encode(html);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  const encoded = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `${base}?html=${encoded}`;
-}
-
-// Use it:
-window.open(buildViewerLink(myHtml), '_blank');
-```
-
-### Limits
-
-- URLs have a practical size limit of roughly **2,000–8,000 characters** depending on the browser.
-- For large HTML, consider a backend that stores snippets and links with an ID instead.
-
 ## Checkpoint
 
 This project includes a git tag for the initial release:

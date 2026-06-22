@@ -8,7 +8,6 @@ import { linter, lintGutter } from '@codemirror/lint';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { HTMLHint } from 'htmlhint';
 import html2pdf from 'html2pdf.js';
-import { parseHtmlFromUrl, clearImportParams } from './urlImport.js';
 
 const DEFAULT_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -171,12 +170,9 @@ function debouncedPreview(code) {
   previewTimer = setTimeout(() => updatePreview(code), 200);
 }
 
-const imported = parseHtmlFromUrl();
-const initialHtml = imported?.html ?? DEFAULT_HTML;
-
 const editor = new EditorView({
   state: EditorState.create({
-    doc: initialHtml,
+    doc: DEFAULT_HTML,
     extensions: [
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -198,8 +194,7 @@ const editor = new EditorView({
   parent: document.getElementById('editor'),
 });
 
-updatePreview(initialHtml);
-if (imported) clearImportParams();
+updatePreview(DEFAULT_HTML);
 initTheme();
 
 themeToggle.addEventListener('click', () => {
