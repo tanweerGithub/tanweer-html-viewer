@@ -1,4 +1,4 @@
-# Tanweer's Html Viewer
+# Tanweer HTML Viewer
 
 A minimalist web app for writing HTML, previewing it live, and exporting the result as a PDF.
 

@@ -156,7 +156,7 @@ const editor = new EditorView({
 updatePreview(DEFAULT_HTML);
 
 /* Resizable divider */
-const STORAGE_KEY = 'tanweers-html-viewer-split';
+const STORAGE_KEY = 'tanweer-html-viewer-split';
 function setSplit(percent) {
   const clamped = Math.min(Math.max(percent, 15), 85);
   document.documentElement.style.setProperty('--code-width', `${clamped}%`);
