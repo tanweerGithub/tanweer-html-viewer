@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tanweer's Html Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <span class="brand-name">Tanweer's Html Viewer</span>
+        </div>
+        <p class="tagline">Write · Preview · Export</p>
+      </header>
+
+      <main class="workspace" id="workspace">
+        <section class="panel panel-code" id="panel-code">
+          <div class="panel-header">
+            <span class="panel-label">Code</span>
+            <span class="lint-status" id="lint-status"></span>
+          </div>
+          <div class="editor-wrap" id="editor"></div>
+        </section>
+
+        <div
+          class="divider"
+          id="divider"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize panels"
+          tabindex="0"
+        ></div>
+
+        <section class="panel panel-preview" id="panel-preview">
+          <div class="panel-header">
+            <span class="panel-label">Preview</span>
+            <button class="btn-download" id="download-pdf" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download PDF
+            </button>
+          </div>
+          <div class="preview-wrap">
+            <iframe
+              id="preview-frame"
+              title="HTML Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            ></iframe>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
